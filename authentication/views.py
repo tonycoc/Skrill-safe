@@ -10,6 +10,8 @@ from django.http import *
 from django.views.generic.edit import FormView
 from django.core.mail import send_mail
 from django.conf import settings
+import datetime
+
 
 def is_auth(request) -> bool:
     return request.user.is_authenticated
@@ -312,14 +314,14 @@ def forget_password(request):
 
         if user.exists():
             user = user.first()
-            try:
-                token = Temp_Token.objects.create(user_id=user.id)
-                return redirect(f'/auth/password-change/{token.token}')
-            except:
-                token = Temp_Token.objects.get(user_id=user.id)
-                token.delete()
-                token = Temp_Token.objects.create(user_id=user.id)
-                return redirect(f'/auth/password-change/{token.token}')
+            # try:
+            token = user.temp_token_set.create()
+            return redirect(f'/auth/password-change/{token.token}')
+            # except:
+            #     token = Temp_Token.objects.get(user_id=user.id)
+            #     token.delete()
+            #     token = Temp_Token.objects.create(user_id=user.id)
+            #     return redirect(f'/auth/password-change/{token.token}')
         else:
             fp_form.add_error(field=None,error="wrong credintials")
             return render(request,"forget_password.html",context)
@@ -329,7 +331,7 @@ def forget_password(request):
 
 def pass_change(request,token):
 
-    token = Temp_Token.objects.filter(token=token)
+    token = Temp_Token.objects.filter(token=token,is_valid=True)
 
     change_form = Change_pass(request.POST or None)
 
@@ -339,37 +341,53 @@ def pass_change(request,token):
 
     if token.exists():
 
-        if change_form.is_valid():
+        today = datetime.datetime.today().replace(tzinfo=None)
 
-            password = change_form.cleaned_data["password"]
-            confirm_passowrd = change_form.cleaned_data["confirm_password"]
+        delta = today - token.first().created_date.replace(tzinfo=None)
 
-            if type(pass_validate(password,confirm_passowrd)) == bool:
+        token = token.first()
 
-                token = token.first()
+        seconds = delta.seconds - 12600
 
-                user = myUser.objects.filter(temp_token=token)
+        if delta.days == 0 and seconds < 300: #after 5 minutes token'll be devalidated
+
+            if change_form.is_valid():
+
+                password = change_form.cleaned_data["password"]
+                confirm_passowrd = change_form.cleaned_data["confirm_password"]
+
+                if type(pass_validate(password,confirm_passowrd)) == bool:
+
+                    user = myUser.objects.filter(temp_token=token)
 
 
-                if user.exists():
-                    user = user.first()
-                    user.set_password(password)
-                    user.save()
+                    if user.exists():
+                        user = user.first()
+                        user.set_password(password)
+                        user.save()
 
-                    token.delete()
-                    return redirect("authentication:login")
+                        token.is_valid = False
+                        token.save()
+
+                        return redirect("authentication:login")
+
+                    else:
+                        return render(request, 'password_change.html', context=context)
 
                 else:
+
+                    change_form.add_error(field=None, error=pass_validate(password,confirm_passowrd))
                     return render(request, 'password_change.html', context=context)
 
-            else:
-
-                change_form.add_error(field=None, error=pass_validate(password,confirm_passowrd))
-                return render(request, 'password_change.html', context=context)
+        else:
+            
+            token.is_valid = False
+            token.save()
+            return HttpResponseBadRequest()
 
 
     else:
-        return HttpResponseBadRequest()
+        return HttpResponseBadRequest('')
 
     return render(request, 'password_change.html', context=context)
 

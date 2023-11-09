@@ -13,7 +13,10 @@ class admin_user(admin.ModelAdmin):
     sortable_by = ['is_active','is_superuser']
     search_fields = ['username']
     list_filter = ['is_active','is_staff']
+    readonly_fields = ['created_date']
 
+class admin_temp_token(admin.ModelAdmin):
+    readonly_fields = ['created_date']
 
+admin.site.register(Temp_Token, admin_temp_token)
 admin.site.register(myUser, admin_user)
-admin.site.register(Temp_Token)

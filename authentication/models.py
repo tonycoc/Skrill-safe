@@ -48,7 +48,7 @@ class myUser(AbstractBaseUser):
     is_superuser = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-
+    created_date = models.DateTimeField(auto_now_add=True,null=True)
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ['phone_number']
 
@@ -71,22 +71,26 @@ class myUser(AbstractBaseUser):
 
 class Temp_Token(models.Model):
 
-    token = models.CharField(max_length=36,null=False)
+    token = models.UUIDField(null=False)
 
-    user = models.OneToOneField(myUser,on_delete=models.CASCADE)
+    user = models.ForeignKey(myUser,on_delete=models.CASCADE)
 
     created_date = models.DateTimeField(auto_now_add=True)
+
+    is_valid = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Temp Token"
         verbose_name_plural = "Temp Tokens"
 
     def __str__(self):
-        return self.token
+        return str(self.token)
 
 @receiver(pre_save,sender=Temp_Token)
 def token_handler(sender,instance,**kwargs):
-    instance.token = uuid.uuid4()
+
+    if instance.token == None:
+        instance.token = uuid.uuid4()
 
 @receiver(pre_save,sender=myUser)
 def phone_handler(sender,instance,**kwargs):

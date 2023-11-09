@@ -31,36 +31,37 @@ def pay_factor(request,paylink):
 
             context["balance"] = user_card.balance
 
-            obj = obj.first()
+            factor = obj.first()
 
-            if obj.status == "payed":
+            if factor.status == "payed":
                 context["payed"] = True
-                context["factor"] = obj
+                context["factor"] = factor
                 return render(request, "factor_pay.html", context)
             else:
-                obj.status = "Entered paying page"
-                obj.from_u = Card.objects.get(owner_id=request.user.id)
-                obj.save()
-                context["factor"] = obj
+                factor.status = "N"
+                factor.from_u = Card.objects.get(owner_id=request.user.id)
+                factor.save()
+                context["factor"] = factor
 
                 if request.method == "POST":
-                    if (obj.amount*1.2/100 + obj.amount) > user_card.balance:
+                    if (factor.amount*1.2/100 + factor.amount) > user_card.balance:
                         context["error"] = "balance"
                         return render(request, "factor_pay.html", context)
 
                     else:
 
-                        obj.to.balance +=  obj.amount
-                        obj.status = "payed"
-                        obj.payed_date = datetime.datetime.now()
-                        user_card.balance -= obj.amount*1.2/100 + obj.amount
+                        factor.to.balance +=  factor.amount
+                        factor.status = "P"
+                        factor.payed_date = datetime.datetime.now()
+                        user_card.balance -= factor.amount*1.2/100 + factor.amount
 
 
-                        obj.save()
-                        obj.to.save()
+                        factor.save()
+                        factor.to.save()
                         user_card.save()
 
                         context["payed"] = True
+
                         return render(request, "factor_pay.html", context)
 
             return render(request,"factor_pay.html",context)
@@ -90,6 +91,7 @@ def transfer(request):
     if transfer_form.is_valid():
 
         card = Card.objects.filter(owner_id=request.user.id, is_active=True)
+
         if not card.exists():
             context["error"] = "nocard"
             return render(request, "transfer.html", context)
@@ -98,6 +100,7 @@ def transfer(request):
         amount = transfer_form.cleaned_data["amount"]
         description = transfer_form.cleaned_data["description"]
         dest_card = Card.objects.filter(card_number=to)
+
         if dest_card.exists():
             factor = Factor.objects.create(to=dest_card.first(),amount=amount,description=description)
             factor.save()
@@ -120,7 +123,7 @@ def transactions(request,card_number):
         if card.owner.id == user.id:
 
             if not request.GET:
-                factors = Factor.objects.filter((Q(from_u=card) | Q(to=card)) & Q(status="payed")).order_by("-payed_date")
+                factors = Factor.objects.filter((Q(from_u=card) | Q(to=card)) & Q(status="P")).order_by("-payed_date")
                 return render(request, "transactions.html", context={"factors": factors})
             else:
                 ### search filters ###
